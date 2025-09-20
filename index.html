@@ -6,6 +6,7 @@
     <title>MovieFlix - Catálogo de Películas con IA</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         .movie-card { transition: transform 0.3s ease; }
         .movie-card:hover { transform: scale(1.05); }
@@ -20,6 +21,20 @@
             height: 400px;
             object-fit: cover;
             width: 100%;
+        }
+        .platform-logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: white;
+        }
+        .comment {
+            border-left: 3px solid #3b82f6;
+            background-color: #1f2937;
         }
         @media (max-width: 768px) {
             .poster-image {
@@ -164,6 +179,56 @@
         let currentMovies = [];
         let recommendationModel = null;
 
+        // Datos de plataformas de streaming
+        const streamingPlatforms = {
+            "Netflix": { color: "bg-red-600", icon: "fab fa-netflix" },
+            "Amazon Prime": { color: "bg-blue-500", icon: "fab fa-amazon" },
+            "Disney+": { color: "bg-blue-700", icon: "fas fa-crown" },
+            "HBO Max": { color: "bg-purple-600", icon: "fab fa-hbo" },
+            "Apple TV+": { color: "bg-gray-800", icon: "fab fa-apple" },
+            "Hulu": { color: "bg-green-600", icon: "fas fa-play" },
+            "Paramount+": { color: "bg-blue-600", icon: "fas fa-plus" }
+        };
+
+        // Asignar plataformas a películas (simulado)
+        const moviePlatforms = {
+            "tt0848228": ["Netflix", "Disney+"],
+            "tt0111161": ["Amazon Prime", "HBO Max"],
+            "tt0133093": ["Netflix", "Hulu"],
+            "tt1375666": ["Amazon Prime", "HBO Max"],
+            "tt0120737": ["Amazon Prime", "HBO Max"],
+            "tt0167260": ["Amazon Prime", "HBO Max"],
+            "tt0137523": ["Netflix", "Hulu"],
+            "tt0076759": ["Disney+"],
+            "tt0080684": ["Disney+"],
+            "tt0086190": ["Disney+"],
+            "tt0110912": ["Netflix", "HBO Max"],
+            "tt0109830": ["Netflix", "Amazon Prime"],
+            "tt0120815": ["Netflix", "Paramount+"],
+            "tt0110357": ["Disney+"],
+            "tt0317705": ["Disney+"],
+            "tt0241527": ["Amazon Prime", "HBO Max"],
+            "tt0295297": ["Amazon Prime", "HBO Max"],
+            "tt0304141": ["Amazon Prime", "HBO Max"],
+            "tt0330373": ["Amazon Prime", "HBO Max"],
+            "tt0373889": ["Amazon Prime", "HBO Max"],
+            "tt0417741": ["Amazon Prime", "HBO Max"],
+            "tt0926084": ["Amazon Prime", "HBO Max"],
+            "tt1201607": ["Amazon Prime", "HBO Max"],
+            "tt0468569": ["Netflix", "HBO Max"],
+            "tt1345836": ["Netflix", "HBO Max"],
+            "tt0114709": ["Disney+"],
+            "tt0120363": ["Disney+"],
+            "tt0435761": ["Disney+"],
+            "tt1979376": ["Disney+"],
+            "tt0119217": ["Netflix", "Amazon Prime"],
+            "tt0108052": ["Netflix", "Amazon Prime"],
+            "tt0088763": ["Netflix", "Amazon Prime"]
+        };
+
+        // Datos de comentarios (almacenamiento local)
+        let movieComments = JSON.parse(localStorage.getItem('movieComments')) || {};
+
         const sampleMovies = [
             { imdbID: "tt0848228", Title: "The Avengers", Year: "2012", Poster: "https://m.media-amazon.com/images/M/MV5BNDYxNjQyMjAtNTdiOS00NGYwLWFmNTAtNThmYjU5ZGI2YTI1XkEyXkFqcGdeQXVyMTMxODk2OTU@._V1_SX300.jpg", Genre: "Action, Adventure, Sci-Fi", Plot: "Earth's mightiest heroes must come together and learn to fight as a team if they are going to stop the mischievous Loki and his alien army from enslaving humanity.", Director: "Joss Whedon", Actors: "Robert Downey Jr., Chris Evans, Scarlett Johansson", imdbRating: "8.0" },
             { imdbID: "tt0111161", Title: "The Shawshank Redemption", Year: "1994", Poster: "https://m.media-amazon.com/images/M/MV5BNDE3ODcxYzMtY2YzZC00NmNlLWJiNDMtZDViZWM2MzIxZDYwXkEyXkFqcGdeQXVyNjAwNDUxODI@._V1_SX300.jpg", Genre: "Drama", Plot: "Two imprisoned men bond over a number of years, finding solace and eventual redemption through acts of common decency.", Director: "Frank Darabont", Actors: "Tim Robbins, Morgan Freeman, Bob Gunton", imdbRating: "9.3" },
@@ -192,7 +257,7 @@
             { imdbID: "tt1345836", Title: "The Dark Knight Rises", Year: "2012", Poster: "https://m.media-amazon.com/images/M/MV5BMTk4ODQzNDY3Ml5BMl5BanBnXkFtZTcwODA0NTM4Nw@@._V1_SX300.jpg", Genre: "Action, Adventure", Plot: "Eight years after the Joker's reign of anarchy, Batman, with the help of the enigmatic Catwoman, is forced from his exile to save Gotham City from the brutal guerrilla terrorist Bane.", Director: "Christopher Nolan", Actors: "Christian Bale, Tom Hardy, Anne Hathaway", imdbRating: "8.4" },
             { imdbID: "tt0114709", Title: "Toy Story", Year: "1995", Poster: "https://m.media-amazon.com/images/M/MV5BMDU2ZWJlMjktMTRhMy00ZTA5LWEzNDgtYmNmZTEwZTViZWJkXkEyXkFqcGdeQXVyNDQ2OTk4MzI@._V1_SX300.jpg", Genre: "Animation, Adventure, Comedy", Plot: "A cowboy doll is profoundly threatened and jealous when a new spaceman figure supplants him as top toy in a boy's room.", Director: "John Lasseter", Actors: "Tom Hanks, Tim Allen, Don Rickles", imdbRating: "8.3" },
             { imdbID: "tt0120363", Title: "Toy Story 2", Year: "1999", Poster: "https://m.media-amazon.com/images/M/MV5BMWM5ZDcxMTYtNTEyNS00MDRkLWI3YTItNThmMGExMWY4NDIwXkEyXkFqcGdeQXVyNjUwNzk3NDc@._V1_SX300.jpg", Genre: "Animation, Adventure, Comedy", Plot: "When Woody is stolen by a toy collector, Buzz and his friends set out on a rescue mission to save Woody before he becomes a museum toy property with his roundup gang Jessie, Prospector, and Bullseye.", Director: "John Lasseter, Ash Brannon, Lee Unkrich", Actors: "Tom Hanks, Tim Allen, Joan Cusack", imdbRating: "7.9" },
-            { imdbID: "tt0435761", Title: "Toy Story 3", Year: "2010", Poster: "https://m.media-amazon.com/images/M/MV5BMTgxOTY4Mjc0MF5BMl5BanBnXkFtZTcwNTA4MDQyMw@@._V1_SX300.jpg", Genre: "Animation, Adventure, Comedy", Plot: "The toys are mistakenly delivered to a day-care center instead of the attic right before Andy leaves for college, and it's up to Woody to convince the other toys that they weren't abandoned and to return home.", Director: "Lee Unkrich", Actors: "Tom Hanks, Tim Allen, Joan Cusack", imdbRating: "8.3" },
+            { imdbID: "tt0435761", Title: "Toy Story 3", Year: "2010", Poster: "https://m.media-amazon.com/images/M/MV5BMTgxOTY4Mjc0MF5BMl5BanBnXkFtZTcwNta4MDQyMw@@._V1_SX300.jpg", Genre: "Animation, Adventure, Comedy", Plot: "The toys are mistakenly delivered to a day-care center instead of the attic right before Andy leaves for college, and it's up to Woody to convince the other toys that they weren't abandoned and to return home.", Director: "Lee Unkrich", Actors: "Tom Hanks, Tim Allen, Joan Cusack", imdbRating: "8.3" },
             { imdbID: "tt1979376", Title: "Toy Story 4", Year: "2019", Poster: "https://m.media-amazon.com/images/M/MV5BMTYzMDM4NzkxOV5BMl5BanBnXkFtZTgwNzM1Mzg2NzM@._V1_SX300.jpg", Genre: "Animation, Adventure, Comedy", Plot: "When a new toy called 'Forky' joins Woody and the gang, a road trip alongside old and new friends reveals how big the world can be for a toy.", Director: "Josh Cooley", Actors: "Tom Hanks, Tim Allen, Annie Potts", imdbRating: "7.7" },
             { imdbID: "tt0119217", Title: "Good Will Hunting", Year: "1997", Poster: "https://m.media-amazon.com/images/M/MV5BOTI0MzcxMTYtZDVkMy00NjY1LTgyMTYtZmUxN2M3NmQ2NWJhXkEyXkFqcGdeQXVyMTQxNzMzNDI@._V1_SX300.jpg", Genre: "Drama, Romance", Plot: "Will Hunting, a janitor at M.I.T., has a gift for mathematics, but needs help from a psychologist to find direction in his life.", Director: "Gus Van Sant", Actors: "Robin Williams, Matt Damon, Ben Affleck", imdbRating: "8.3" },
             { imdbID: "tt0108052", Title: "Schindler's List", Year: "1993", Poster: "https://m.media-amazon.com/images/M/MV5BNDE4OTMxMTctNmRhYy00NWE2LTg3YzItYTk3M2UwOTU5Njg4XkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_SX300.jpg", Genre: "Biography, Drama, History", Plot: "In German-occupied Poland during World War II, industrialist Oskar Schindler gradually becomes concerned for his Jewish workforce after witnessing their persecution by the Nazis.", Director: "Steven Spielberg", Actors: "Liam Neeson, Ralph Fiennes, Ben Kingsley", imdbRating: "9.0" },
@@ -301,6 +366,12 @@
             const detailContainer = document.getElementById('movie-detail-content');
             
             if (movie) {
+                // Obtener plataformas para esta película
+                const platforms = moviePlatforms[movieId] || [];
+                
+                // Obtener comentarios para esta película
+                const comments = movieComments[movieId] || [];
+                
                 detailContainer.innerHTML = `
                     <div class="bg-gray-800 rounded-lg shadow-lg overflow-hidden mb-10">
                         <div class="md:flex">
@@ -324,11 +395,25 @@
                                     <div><h3 class="font-semibold mb-1">Director</h3><p class="text-gray-300">${movie.Director}</p></div>
                                     <div><h3 class="font-semibold mb-1">Reparto</h3><p class="text-gray-300">${movie.Actors}</p></div>
                                 </div>
+                                
+                                ${platforms.length > 0 ? `
+                                <div class="mb-6">
+                                    <h3 class="text-xl font-semibold mb-3">Disponible en:</h3>
+                                    <div class="flex flex-wrap gap-3">
+                                        ${platforms.map(platform => `
+                                            <div class="flex items-center ${streamingPlatforms[platform].color} px-3 py-2 rounded-lg">
+                                                <i class="${streamingPlatforms[platform].icon} mr-2"></i>
+                                                <span>${platform}</span>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                                ` : ''}
                             </div>
                         </div>
                     </div>
                     
-                    <div class="bg-gray-800 rounded-lg shadow-lg p-6">
+                    <div class="bg-gray-800 rounded-lg shadow-lg p-6 mb-10">
                         <h2 class="text-2xl font-bold mb-4">Sistema de Recomendación con IA</h2>
                         <div class="mb-6">
                             <p class="mb-4">Valora esta película y nuestro sistema de IA te recomendará películas similares:</p>
@@ -343,8 +428,91 @@
                         </div>
                         <div id="recommendation-result"></div>
                     </div>
+                    
+                    <div class="bg-gray-800 rounded-lg shadow-lg p-6">
+                        <h2 class="text-2xl font-bold mb-4">Comentarios</h2>
+                        
+                        <form onsubmit="addComment(event, '${movieId}')" class="mb-8">
+                            <div class="mb-4">
+                                <label for="comment-name" class="block text-lg font-semibold mb-2">Tu nombre:</label>
+                                <input type="text" id="comment-name" required class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ingresa tu nombre">
+                            </div>
+                            <div class="mb-4">
+                                <label for="comment-text" class="block text-lg font-semibold mb-2">Tu comentario:</label>
+                                <textarea id="comment-text" required rows="4" class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Escribe tu comentario aquí..."></textarea>
+                            </div>
+                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">Publicar Comentario</button>
+                        </form>
+                        
+                        <div id="comments-container">
+                            ${comments.length > 0 ? 
+                                comments.map(comment => `
+                                    <div class="comment p-4 rounded-lg mb-4">
+                                        <div class="flex justify-between items-center mb-2">
+                                            <h4 class="font-semibold">${comment.name}</h4>
+                                            <span class="text-sm text-gray-400">${comment.date}</span>
+                                        </div>
+                                        <p class="text-gray-300">${comment.text}</p>
+                                    </div>
+                                `).join('') 
+                                : '<p class="text-gray-400 text-center py-4">No hay comentarios aún. ¡Sé el primero en comentar!</p>'
+                            }
+                        </div>
+                    </div>
                 `;
+                
+                // Restaurar calificación si existe
+                const savedRating = localStorage.getItem(`rating_${movieId}`);
+                if (savedRating) {
+                    rateMovie(parseInt(savedRating), movieId);
+                }
             }
+        }
+
+        function addComment(event, movieId) {
+            event.preventDefault();
+            
+            const nameInput = document.getElementById('comment-name');
+            const textInput = document.getElementById('comment-text');
+            
+            const comment = {
+                name: nameInput.value,
+                text: textInput.value,
+                date: new Date().toLocaleDateString('es-ES', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                })
+            };
+            
+            // Inicializar array de comentarios si no existe
+            if (!movieComments[movieId]) {
+                movieComments[movieId] = [];
+            }
+            
+            // Agregar comentario
+            movieComments[movieId].unshift(comment);
+            
+            // Guardar en localStorage
+            localStorage.setItem('movieComments', JSON.stringify(movieComments));
+            
+            // Limpiar formulario
+            nameInput.value = '';
+            textInput.value = '';
+            
+            // Actualizar visualización de comentarios
+            const commentsContainer = document.getElementById('comments-container');
+            commentsContainer.innerHTML = movieComments[movieId].map(c => `
+                <div class="comment p-4 rounded-lg mb-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="font-semibold">${c.name}</h4>
+                        <span class="text-sm text-gray-400">${c.date}</span>
+                    </div>
+                    <p class="text-gray-300">${c.text}</p>
+                </div>
+            `).join('');
         }
 
         function rateMovie(rating, movieId) {
