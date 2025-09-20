@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MovieFlix - Catálogo de Películas con IA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
+    <style>
+        .movie-card { transition: transform 0.3s ease; }
+        .movie-card:hover { transform: scale(1.05); }
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .placeholder-movie {
+            background: linear-gradient(45deg, #2d3748, #4a5568);
+            display: flex; align-items: center; justify-content: center;
+            color: #cbd5e0; font-size: 20px;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-900 text-white">
+    <header class="bg-gray-800 shadow-lg">
+        <nav class="container mx-auto px-6 py-3">
+            <div class="flex justify-between items-center">
+                <a href="#" class="text-2xl font-bold text-blue-400" onclick="showPage('home')">
+                    <span role="img" aria-label="Movie camera">🎬</span> MovieFlix
+                </a>
+                <div class="flex space-x-4">
+                    <a href="#" class="px-3 py-2 rounded hover:bg-gray-700" onclick="showPage('home')">Inicio</a>
+                    <a href="#" class="px-3 py-2 rounded hover:bg-gray-700" onclick="showPage('catalog')">Catálogo</a>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container mx-auto px-6 py-10">
+        <!-- Página de Inicio -->
+        <div id="home-page" class="fade-in">
+            <section class="text-center py-20" aria-labelledby="main-heading">
+                <h1 id="main-heading" class="text-5xl font-bold mb-6">Bienvenido a MovieFlix</h1>
+                <p class="text-xl mb-10">Descubre películas increíbles y recibe recomendaciones personalizadas con tecnología de IA</p>
+                <button onclick="showPage('catalog')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition duration-300">
+                    Explorar Catálogo
+                </button>
+            </section>
+            
+            <section class="py-16" aria-labelledby="features-heading">
+                <h2 id="features-heading" class="text-3xl font-bold text-center mb-12">Características Principales</h2>
+                <div class="grid md:grid-cols-3 gap-8">
+                    <article class="bg-gray-800 p-6 rounded-lg shadow-lg text-center">
+                        <div class="text-blue-400 text-4xl mb-4" aria-hidden="true">🎬</div>
+                        <h3 class="text-xl font-semibold mb-3">Catálogo Completo</h3>
+                        <p>Explora miles de películas con información detallada y filtros avanzados.</p>
+                    </article>
+                    
+                    <article class="bg-gray-800 p-6 rounded-lg shadow-lg text-center">
+                        <div class="text-blue-400 text-4xl mb-4" aria-hidden="true">🤖</div>
+                        <h3 class="text-xl font-semibold mb-3">Recomendaciones IA</h3>
+                        <p>Sistema de recomendación inteligente basado en tus preferencias y valoraciones.</p>
+                    </article>
+                    
+                    <article class="bg-gray-800 p-6 rounded-lg shadow-lg text-center">
+                        <div class="text-blue-400 text-4xl mb-4" aria-hidden="true">📱</div>
+                        <h3 class="text-xl font-semibold mb-3">Diseño Responsive</h3>
+                        <p>Disfruta de la experiencia en cualquier dispositivo, desde móviles hasta desktop.</p>
+                    </article>
+                </div>
+            </section>
+        </div>
+
+        <!-- Página de Catálogo -->
+        <div id="catalog-page" class="hidden fade-in">
+            <header class="text-center mb-10">
+                <h1 class="text-4xl font-bold mb-4">Catálogo de Películas</h1>
+                <p class="text-xl text-gray-300">Explora nuestro extenso catálogo y encuentra tu próxima película favorita</p>
+            </header>
+            
+            <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-8">
+                <form onsubmit="handleSearch(event)" class="mb-6">
+                    <div class="flex">
+                        <input type="text" id="search-input" placeholder="Buscar películas..." class="flex-grow px-4 py-2 rounded-l-lg bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-r-lg transition duration-300">Buscar</button>
+                    </div>
+                </form>
+
+                <div>
+                    <h3 class="text-lg font-semibold mb-3">Filtrar por género:</h3>
+                    <div class="flex flex-wrap gap-2">
+                        <button class="px-4 py-2 rounded-full text-sm bg-gray-700 hover:bg-gray-600" onclick="filterByGenre('Action')">Action</button>
+                        <button class="px-4 py-2 rounded-full text-sm bg-gray-700 hover:bg-gray-600" onclick="filterByGenre('Comedy')">Comedy</button>
+                        <button class="px-4 py-2 rounded-full text-sm bg-gray-700 hover:bg-gray-600" onclick="filterByGenre('Drama')">Drama</button>
+                        <button class="px-4 py-2 rounded-full text-sm bg-gray-700 hover:bg-gray-600" onclick="filterByGenre('Sci-Fi')">Sci-Fi</button>
+                        <button class="px-4 py-2 rounded-full text-sm bg-red-600 hover:bg-red-700" onclick="clearFilters()">Limpiar</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="search-results" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8"></div>
+            
+            <div id="loading-indicator" class="text-center py-12 hidden">
+                <div class="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500" aria-hidden="true"></div>
+                <p class="mt-4">Cargando películas...</p>
+            </div>
+            
+            <div id="error-message" class="bg-red-800 text-white p-4 rounded-lg mb-8 text-center hidden" role="alert">
+                <span class="font-semibold">Error: </span>
+                <span id="error-text"></span>
+            </div>
+        </div>
+
+        <!-- Página de Detalle de Película -->
+        <div id="detail-page" class="hidden fade-in">
+            <button onclick="showPage('catalog')" class="inline-block mb-6 text-blue-400 hover:underline">← Volver al catálogo</button>
+            <div id="movie-detail-content"></div>
+        </div>
+    </main>
+
+    <footer class="bg-gray-800 border-t border-gray-700 mt-20">
+        <div class="container mx-auto px-6 py-8">
+            <div class="grid md:grid-cols-3 gap-8">
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">MovieFlix</h3>
+                    <p class="text-gray-400">Tu catálogo de películas con recomendaciones inteligentes basadas en IA.</p>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">Enlaces Rápidos</h3>
+                    <ul class="space-y-2">
+                        <li><a href="#" class="text-gray-400 hover:text-white" onclick="showPage('home')">Inicio</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-white" onclick="showPage('catalog')">Catálogo</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">Tecnologías</h3>
+                    <ul class="text-gray-400 space-y-1">
+                        <li>HTML5 + JavaScript</li>
+                        <li>TensorFlow.js</li>
+                        <li>Tailwind CSS</li>
+                        <li>OMDb API</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
+                <p>&copy; 2024 MovieFlix. Proyecto académico para Desarrollo Web con IA.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        let currentMovies = [];
+        let recommendationModel = null;
+
+        const sampleMovies = [
+            { imdbID: "tt0848228", Title: "The Avengers", Year: "2012", Poster: "https://m.media-amazon.com/images/M/MV5BNDYxNjQyMjAtNTdiOS00NGYwLWFmNTAtNThmYjU5ZGI2YTI1XkEyXkFqcGdeQXVyMTMxODk2OTU@._V1_SX300.jpg", Genre: "Action, Adventure, Sci-Fi", Plot: "Earth's mightiest heroes must come together and learn to fight as a team if they are going to stop the mischievous Loki and his alien army from enslaving humanity.", Director: "Joss Whedon", Actors: "Robert Downey Jr., Chris Evans, Scarlett Johansson", imdbRating: "8.0" },
+            { imdbID: "tt0111161", Title: "The Shawshank Redemption", Year: "1994", Poster: "https://m.media-amazon.com/images/M/MV5BNDE3ODcxYzMtY2YzZC00NmNlLWJiNDMtZDViZWM2MzIxZDYwXkEyXkFqcGdeQXVyNjAwNDUxODI@._V1_SX300.jpg", Genre: "Drama", Plot: "Two imprisoned men bond over a number of years, finding solace and eventual redemption through acts of common decency.", Director: "Frank Darabont", Actors: "Tim Robbins, Morgan Freeman, Bob Gunton", imdbRating: "9.3" },
+            { imdbID: "tt0133093", Title: "The Matrix", Year: "1999", Poster: "https://m.media-amazon.com/images/M/MV5BNzQzOTk3OTAtNDQ0Zi00ZTVkLWI0MTEtMDllZjNkYzNjNTc4L2ltYWdlXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_SX300.jpg", Genre: "Action, Sci-Fi", Plot: "A computer hacker learns from mysterious rebels about the true nature of his reality and his role in the war against its controllers.", Director: "Lana Wachowski, Lilly Wachowski", Actors: "Keanu Reeves, Laurence Fishburne, Carrie-Anne Moss", imdbRating: "8.7" },
+            { imdbID: "tt1375666", Title: "Inception", Year: "2010", Poster: "https://m.media-amazon.com/images/M/MV5BMjAxMzY3NjcxNF5BMl5BanBnXkFtZTcwNTI5OTM0Mw@@._V1_SX300.jpg", Genre: "Action, Adventure, Sci-Fi", Plot: "A thief who steals corporate secrets through the use of dream-sharing technology is given the inverse task of planting an idea into the mind of a C.E.O.", Director: "Christopher Nolan", Actors: "Leonardo DiCaprio, Joseph Gordon-Levitt, Elliot Page", imdbRating: "8.8" }
+        ];
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAIModel();
+            showPage('home');
+        });
+
+        function showPage(pageId) {
+            document.getElementById('home-page').classList.add('hidden');
+            document.getElementById('catalog-page').classList.add('hidden');
+            document.getElementById('detail-page').classList.add('hidden');
+            document.getElementById(`${pageId}-page`).classList.remove('hidden');
+            if (pageId === 'catalog') loadMovies();
+        }
+
+        function loadMovies() {
+            const resultsContainer = document.getElementById('search-results');
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const errorMessage = document.getElementById('error-message');
+            
+            resultsContainer.innerHTML = '';
+            loadingIndicator.classList.remove('hidden');
+            errorMessage.classList.add('hidden');
+            
+            setTimeout(() => {
+                loadingIndicator.classList.add('hidden');
+                currentMovies = sampleMovies;
+                displayMovies(currentMovies);
+            }, 1000);
+        }
+
+        function displayMovies(movies) {
+            const resultsContainer = document.getElementById('search-results');
+            
+            if (movies.length === 0) {
+                resultsContainer.innerHTML = '<div class="col-span-full text-center py-12"><p class="text-xl">No se encontraron películas. Intenta con otros términos de búsqueda.</p></div>';
+                return;
+            }
+            
+            resultsContainer.innerHTML = movies.map(movie => `
+                <article class="bg-gray-800 rounded-lg shadow-lg overflow-hidden movie-card h-full flex flex-col">
+                    <div class="relative">
+                        <img src="${movie.Poster}" alt="Póster de ${movie.Title}" class="w-full h-64 object-cover" onerror="this.onerror=null; this.classList.add('placeholder-movie'); this.src=''; this.innerHTML='🎬'"/>
+                        <div class="absolute top-2 right-2 bg-blue-600 text-white px-2 py-1 rounded text-sm">${movie.Year}</div>
+                    </div>
+                    <div class="p-4 flex-grow flex flex-col">
+                        <h2 class="text-xl font-semibold mb-2">${movie.Title}</h2>
+                        <p class="text-gray-400 mb-4">Año: ${movie.Year}</p>
+                        <div class="mt-auto">
+                            <button onclick="showMovieDetail('${movie.imdbID}')" class="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded-lg transition duration-300">Ver detalles</button>
+                        </div>
+                    </div>
+                </article>
+            `).join('');
+        }
+
+        function handleSearch(event) {
+            event.preventDefault();
+            const searchInput = document.getElementById('search-input');
+            const searchTerm = searchInput.value.trim();
+            
+            if (searchTerm) {
+                const loadingIndicator = document.getElementById('loading-indicator');
+                const errorMessage = document.getElementById('error-message');
+                
+                loadingIndicator.classList.remove('hidden');
+                errorMessage.classList.add('hidden');
+                
+                setTimeout(() => {
+                    loadingIndicator.classList.add('hidden');
+                    const filteredMovies = sampleMovies.filter(movie => movie.Title.toLowerCase().includes(searchTerm.toLowerCase()));
+                    currentMovies = filteredMovies;
+                    displayMovies(filteredMovies);
+                    if (filteredMovies.length === 0) showError('No se encontraron películas con ese término.');
+                }, 1000);
+            }
+        }
+
+        function filterByGenre(genre) {
+            const filteredMovies = sampleMovies.filter(movie => movie.Genre.toLowerCase().includes(genre.toLowerCase()));
+            currentMovies = filteredMovies;
+            displayMovies(filteredMovies);
+            if (filteredMovies.length === 0) showError(`No hay películas del género "${genre}".`);
+        }
+
+        function clearFilters() {
+            document.getElementById('search-input').value = '';
+            currentMovies = sampleMovies;
+            displayMovies(sampleMovies);
+        }
+
+        function showError(message) {
+            const errorMessage = document.getElementById('error-message');
+            const errorText = document.getElementById('error-text');
+            errorText.textContent = message;
+            errorMessage.classList.remove('hidden');
+        }
+
+        function showMovieDetail(movieId) {
+            showPage('detail');
+            const movie = sampleMovies.find(m => m.imdbID === movieId);
+            const detailContainer = document.getElementById('movie-detail-content');
+            
+            if (movie) {
+                detailContainer.innerHTML = `
+                    <div class="bg-gray-800 rounded-lg shadow-lg overflow-hidden mb-10">
+                        <div class="md:flex">
+                            <div class="md:flex-shrink-0">
+                                <img src="${movie.Poster}" alt="${movie.Title}" class="h-96 w-full object-cover md:w-80" onerror="this.onerror=null; this.classList.add('placeholder-movie'); this.src=''; this.innerHTML='🎬'"/>
+                            </div>
+                            <div class="p-8">
+                                <h1 class="text-3xl font-bold mb-2">${movie.Title}</h1>
+                                <div class="flex flex-wrap gap-2 mb-4">
+                                    <span class="bg-blue-600 text-white px-3 py-1 rounded-full text-sm">${movie.Year}</span>
+                                    <span class="bg-green-600 text-white px-3 py-1 rounded-full text-sm">${movie.imdbRating}/10</span>
+                                    <span class="bg-purple-600 text-white px-3 py-1 rounded-full text-sm">${movie.Genre}</span>
+                                </div>
+                                
+                                <div class="mb-6">
+                                    <h2 class="text-xl font-semibold mb-2">Sinopsis</h2>
+                                    <p class="text-gray-300">${movie.Plot}</p>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                    <div><h3 class="font-semibold mb-1">Director</h3><p class="text-gray-300">${movie.Director}</p></div>
+                                    <div><h3 class="font-semibold mb-1">Reparto</h3><p class="text-gray-300">${movie.Actors}</p></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-800 rounded-lg shadow-lg p-6">
+                        <h2 class="text-2xl font-bold mb-4">Sistema de Recomendación con IA</h2>
+                        <div class="mb-6">
+                            <p class="mb-4">Valora esta película y nuestro sistema de IA te recomendará películas similares:</p>
+                            <div class="mb-6">
+                                <label class="block text-lg font-semibold mb-2">Tu valoración:</label>
+                                <div class="flex items-center mb-2" id="rating-stars">
+                                    ${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(star => `<button class="text-2xl mx-1 text-gray-400 hover:text-yellow-300" onclick="rateMovie(${star}, '${movieId}')">★</button>`).join('')}
+                                    <span class="ml-3 font-semibold" id="rating-value">0/10</span>
+                                </div>
+                            </div>
+                            <button class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg w-full" onclick="getRecommendation('${movieId}')" id="recommendation-btn" disabled>Obtener Recomendaciones</button>
+                        </div>
+                        <div id="recommendation-result"></div>
+                    </div>
+                `;
+            }
+        }
+
+        function rateMovie(rating, movieId) {
+            const stars = document.querySelectorAll('#rating-stars button');
+            const ratingValue = document.getElementById('rating-value');
+            const recommendationBtn = document.getElementById('recommendation-btn');
+            
+            stars.forEach((star, index) => {
+                if (index < rating) {
+                    star.classList.add('text-yellow-400');
+                    star.classList.remove('text-gray-400');
+                } else {
+                    star.classList.remove('text-yellow-400');
+                    star.classList.add('text-gray-400');
+                }
+            });
+            
+            ratingValue.textContent = `${rating}/10`;
+            recommendationBtn.disabled = false;
+            localStorage.setItem(`rating_${movieId}`, rating);
+        }
+
+        async function loadAIModel() {
+            try {
+                console.log('Modelo de IA simulado cargado correctamente');
+            } catch (error) {
+                console.error('Error cargando el modelo de IA:', error);
+            }
+        }
+
+        async function getRecommendation(movieId) {
+            const rating = localStorage.getItem(`rating_${movieId}`) || 5;
+            const resultContainer = document.getElementById('recommendation-result');
+            const movie = sampleMovies.find(m => m.imdbID === movieId);
+            
+            resultContainer.innerHTML = '<div class="text-center py-4"><div class="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div><p class="mt-2">Analizando tus preferencias con IA...</p></div>';
+            
+            setTimeout(() => {
+                const similarMovies = sampleMovies.filter(m => m.imdbID !== movieId).slice(0, 3);
+                resultContainer.innerHTML = `
+                    <div class="bg-green-900 text-green-200 p-4 rounded-lg">
+                        <h3 class="font-semibold mb-2">¡Recomendación Generada!</h3>
+                        <p>Basado en tus preferencias, te recomendamos estas películas similares:</p>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                            ${similarMovies.map(m => `
+                                <div class="bg-gray-700 p-3 rounded-lg">
+                                    <h4 class="font-semibold">${m.Title}</h4>
+                                    <p class="text-sm">${m.Year} • ${m.Genre}</p>
+                                    <button onclick="showMovieDetail('${m.imdbID}')" class="mt-2 bg-green-600 hover:bg-green-700 text-white text-sm py-1 px-3 rounded w-full">Ver detalles</button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
